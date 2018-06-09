@@ -69,6 +69,28 @@ public class InOrderInterpreter
         return mExpressionTreeFactory.makeExpressionTree(parseTree.build());
     }
 
+    private void performReduction (Stack<Symbol> mOperatorStack, Stack<Symbol> mHandleStack) {
+        // Pop the top operator off the stack.
+        Symbol temp = mOperatorStack.pop();
+
+        // A Negate operator symbol triggers unary reduction.
+        if (temp.getType() == sNEGATION) {
+            // Push the reduction onto the handle stack.
+            mHandleStack.push(synthesizeNode(temp, mHandleStack.pop()));
+        }
+        // Other symbols trigger a binary reduction.
+        else {
+            // Pop the top two items off the stack.
+            Symbol rightChild = mHandleStack.pop();
+            Symbol leftChild = mHandleStack.pop();
+
+            // Push the reduction onto the handle stack.
+            mHandleStack.push(synthesizeNode(temp,
+                    leftChild,
+                    rightChild));
+        }
+    }
+
     /**
      * @return Return the root of a parse tree corresponding to the
      * {@code inputExpression}.
@@ -101,52 +123,32 @@ public class InOrderInterpreter
                 // System.out.println("Number = " + ((Number) symbol).mItem);
                 mHandleStack.push(symbol);
             }
-
-            // If the operator on top of the stack is lower precedence than
-            // the current operator symbol then push the symbol on the stack.
-            else if (mTopOfStackPrecedence[mOperatorStack.peek().getType()]
-                     < mCurrentTokenPrecedence[symbolType])
+            else if (symbolType == sLPAREN) {
                 mOperatorStack.push(symbol);
+            }
+            else if (symbolType == sRPAREN) {
+                while (mOperatorStack.peek().getType() != sLPAREN) {
+                    performReduction(mOperatorStack, mHandleStack);
+                }
+                //pop '(' from Operator Stack after all reductions related to the corresponding ')' have been done
+                mOperatorStack.pop();
+            }
+            else if (symbolType == sDELIMITER) {
+                while (mOperatorStack.peek().getType() != sDELIMITER) {
+                    performReduction(mOperatorStack, mHandleStack);
+                }
+                mOperatorStack.pop();
+                root = mHandleStack.pop();
+            }
             else {
                 // As long as the operator on top of the stack is higher precedence
                 // than the current operator symbol perform reductions.
-                while (mTopOfStackPrecedence[mOperatorStack.peek().getType()]
-                       > mCurrentTokenPrecedence[symbolType]) {
-                    // Pop the top operator off the stack.
-                    Symbol temp = mOperatorStack.pop();
-
-                    // A Negate operator symbol triggers unary reduction.
-                    if (temp.getType() == sNEGATION) {
-                        // Push the reduction onto the handle stack.
-                        mHandleStack.push(synthesizeNode(temp, mHandleStack.pop()));
-                    }
-                    // Other symbols trigger a binary reduction.
-                    else {
-                        // Pop the top two items off the stack.
-                        Symbol rightChild = mHandleStack.pop();
-                        Symbol leftChild = mHandleStack.pop();
-
-                        // Push the reduction onto the handle stack.
-                        mHandleStack.push(synthesizeNode(temp,
-                                                         leftChild,
-                                                         rightChild));
-                    }
+                while ((mOperatorStack.peek().getPrecedence() >= symbol.getPrecedence()
+                        &&
+                        (mOperatorStack.peek().getType() != sLPAREN))) {
+                    performReduction (mOperatorStack, mHandleStack);
                 }
-
-                // Get the type that's on top of the operator stack.
-                int topSymbolType = mOperatorStack.peek().getType();
-
-                // If all we have are matching Delimiters we are done.
-                if (topSymbolType == sDELIMITER && symbolType == sDELIMITER) {
-                    root = mHandleStack.pop();
-                }
-                // Remove a getLeftChild-paren when its matching getRightChild-paren is reached.
-                else if (topSymbolType == sLPAREN
-                         && symbolType == sRPAREN) {
-                    mOperatorStack.pop();
-                } else
-                    // Push the symbol onto the top of the operator stack.
-                    mOperatorStack.push(symbol);
+                mOperatorStack.push(symbol);
             }            
         }
 

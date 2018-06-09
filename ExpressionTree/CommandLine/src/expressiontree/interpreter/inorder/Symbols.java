@@ -18,7 +18,7 @@ abstract class Symbol {
     /** 
      * The getPrecedence of the '$' delimiter.
      */
-    final static int sDelimiterPrecedence = 1;
+    final static int sDelimiterPrecedence = 0;
 
     /** 
      * The getPrecedence of the '+' and '-' operators.
